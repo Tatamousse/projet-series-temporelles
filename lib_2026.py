@@ -6,9 +6,20 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 from base64 import b64encode
+from io import BytesIO
 from scipy.stats import norm, ks_2samp
 import scipy.optimize
-import os
+
+# CHARGEMENT DES DONNÉES
+
+def charger_donnees(chemin_fichier):
+    """Charge le CSV, trie par région/date, retourne le DataFrame et la liste des régions valides."""
+    import pandas
+    df = pandas.read_csv(chemin_fichier, sep=";")
+    df = df.sort_values(by=[df.columns[1], df.columns[0]])
+    dic_Region = dict(df[df.columns[1]].value_counts())
+    liste_region = sorted([k for k, v in dic_Region.items() if v > 40])
+    return df, liste_region
 
 # MOMENTS
 
@@ -102,12 +113,9 @@ def Histo_Continue64(data, k):
     ax1.set_ylabel("Effectifs", fontsize=14)
     plt.legend(loc='best')
 
-    plt.savefig('histo64.png', bbox_inches='tight')
+    plt.savefig(buf := BytesIO(), format='png', bbox_inches='tight')
     plt.close()
-    with open('histo64.png', 'rb') as f:
-        base64_string = b64encode(f.read()).decode()
-    os.remove("histo64.png")
-    return base64_string
+    return b64encode(buf.getvalue()).decode()
 
 
 # DENSITÉ SKEW NORMAL
@@ -159,7 +167,7 @@ def estimation_MME(data):
     return xi_tilde, tau_tilde, theta_tilde
 
 
-# ESTIMATION MLE (Maximum de Vraisemblance)
+# ESTIMATION MLE (Maximum de Vraisemblance) 
 
 def estimation_MLE(data):
     """
@@ -191,13 +199,14 @@ def estimation_MLE(data):
         res = scipy.optimize.minimize(neg_log_likelihood, [xi0, tau0, theta0],
                                        method='Nelder-Mead',
                                        options={'maxiter': 5000, 'disp': False})
-        xi_hat, tau_hat, theta_hat = res.x
-        if tau_hat <= 0:
+        if not res.success or not numpy.isfinite(res.fun):
             return xi0, tau0, theta0
-        # Borner le theta final
+        xi_hat, tau_hat, theta_hat = res.x
+        if tau_hat <= 0 or not numpy.isfinite(tau_hat):
+            return xi0, tau0, theta0
         theta_hat = max(-50, min(50, theta_hat))
         return xi_hat, abs(tau_hat), theta_hat
-    except:
+    except Exception:
         return xi0, tau0, theta0
 
 
@@ -220,8 +229,8 @@ def log_vraisemblance_SN(data, k):
     data2 = data[k:]
 
     # Estimation sur chaque sous-échantillon
-    xi1, tau1, theta1 = estimation_MLE(data1)
-    xi2, tau2, theta2 = estimation_MLE(data2)
+    xi1, tau1, theta1 = estimation_MME(data1)
+    xi2, tau2, theta2 = estimation_MME(data2)
 
     # Utiliser le theta moyen (contrainte theta commun)
     theta_commun = (len(data1) * theta1 + len(data2) * theta2) / n
@@ -266,8 +275,14 @@ def detection_rupture_SN(data):
     idx_max = numpy.argmax(log_vraisemblances)
     k_hat = k_range[idx_max]
 
-    # Recalculer les paramètres au point optimal
-    _, params1, params2 = log_vraisemblance_SN(data, k_hat)
+    # Recalculer les paramètres au point optimal avec MLE 
+    data1 = data[:k_hat]
+    data2 = data[k_hat:]
+    xi1, tau1, theta1 = estimation_MLE(data1)
+    xi2, tau2, theta2 = estimation_MLE(data2)
+    theta_commun = (len(data1) * theta1 + len(data2) * theta2) / len(data)
+    params1 = (xi1, tau1, theta_commun)
+    params2 = (xi2, tau2, theta_commun)
 
     return k_hat, params1, params2, log_vraisemblances
 
@@ -289,7 +304,7 @@ def test_KS(data, k_hat):
 
 # GRAPHIQUES EN BASE64 POUR FLASK
 
-def graphe_serie64(X, Date, choix):
+def graphe_serie64(X, Date, choix, nom_variable="Nombre de trains annulés"):
     """Graphe de la série temporelle avec valeur moyenne"""
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111)
@@ -305,20 +320,17 @@ def graphe_serie64(X, Date, choix):
     plt.xticks(indices, XX_ticks, rotation=45, fontsize=9)
 
     plt.xlabel("Date")
-    plt.ylabel("Nombre de trains annulés")
+    plt.ylabel(nom_variable)
     plt.title("Données de la région : %s" % choix)
     plt.legend(loc="best")
     plt.grid()
 
-    plt.savefig('serie.png', bbox_inches='tight')
+    plt.savefig(buf := BytesIO(), format='png', bbox_inches='tight')
     plt.close()
-    with open('serie.png', 'rb') as f:
-        base64_string = b64encode(f.read()).decode()
-    os.remove("serie.png")
-    return base64_string
+    return b64encode(buf.getvalue()).decode()
 
 
-def graphe_rupture64(X, Date, k_hat, params1, params2, choix):
+def graphe_rupture64(X, Date, k_hat, params1, params2, choix, nom_variable="Nombre de trains annulés"):
     """Graphe de la série avec la ligne de rupture"""
     fig = plt.figure(figsize=(11, 7))
     ax = fig.add_subplot(111)
@@ -345,17 +357,14 @@ def graphe_rupture64(X, Date, k_hat, params1, params2, choix):
     plt.xticks(indices, XX_ticks, rotation=45, fontsize=9)
 
     plt.xlabel("Date", fontsize=12)
-    plt.ylabel("Nombre de trains annulés", fontsize=12)
+    plt.ylabel(nom_variable, fontsize=12)
     plt.title("Détection de rupture — Région : %s" % choix, fontsize=14)
     plt.legend(loc="best", fontsize=10)
     plt.grid(alpha=0.3)
 
-    plt.savefig('rupture.png', bbox_inches='tight')
+    plt.savefig(buf := BytesIO(), format='png', bbox_inches='tight')
     plt.close()
-    with open('rupture.png', 'rb') as f:
-        base64_string = b64encode(f.read()).decode()
-    os.remove("rupture.png")
-    return base64_string
+    return b64encode(buf.getvalue()).decode()
 
 
 def graphe_log_vraisemblance64(log_vraisemblances, k_hat, choix):
@@ -377,12 +386,9 @@ def graphe_log_vraisemblance64(log_vraisemblances, k_hat, choix):
     plt.legend(loc="best", fontsize=12)
     plt.grid(alpha=0.3)
 
-    plt.savefig('logvrai.png', bbox_inches='tight')
+    plt.savefig(buf := BytesIO(), format='png', bbox_inches='tight')
     plt.close()
-    with open('logvrai.png', 'rb') as f:
-        base64_string = b64encode(f.read()).decode()
-    os.remove("logvrai.png")
-    return base64_string
+    return b64encode(buf.getvalue()).decode()
 
 
 def graphe_densite_ajustee64(X, k_hat, params1, params2, choix):
@@ -424,9 +430,6 @@ def graphe_densite_ajustee64(X, k_hat, params1, params2, choix):
     plt.title("Densités Skew Normal ajustées — Région : %s" % choix, fontsize=14)
     plt.legend(loc="best", fontsize=10)
 
-    plt.savefig('densite.png', bbox_inches='tight')
+    plt.savefig(buf := BytesIO(), format='png', bbox_inches='tight')
     plt.close()
-    with open('densite.png', 'rb') as f:
-        base64_string = b64encode(f.read()).decode()
-    os.remove("densite.png")
-    return base64_string
+    return b64encode(buf.getvalue()).decode()

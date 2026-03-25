@@ -9,22 +9,10 @@ from lib_2026 import *
 
 import math
 import numpy
-import pandas
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# CHARGEMENT DES DONNÉES
-
-fichier = "./static/data/regularite-mensuelle-ter.csv"
-df_TER = pandas.read_csv(fichier, sep=";")
-
-# Ordonner les données par Région et année-mois
-df_TER = df_TER.sort_values(by=[df_TER.columns[1], df_TER.columns[0]])
-
-dic_Region = dict(df_TER[df_TER.columns[1]].value_counts())
-
-# Régions avec au moins 40 données
-Liste_Region = sorted([k for k, v in dic_Region.items() if v > 40])
+df_TER, Liste_Region = charger_donnees("./static/data/regularite-mensuelle-ter.csv")
 
 # APPLICATION FLASK
 
@@ -43,8 +31,10 @@ def Resultats():
         choix = str(request.form['Choix_region'])
 
         # Extraction des données pour la région choisie
+        col_index = int(request.form.get('Choix_variable', 4))
+        nom_variable = df_TER.columns[col_index]
         df_Choix = df_TER[df_TER[df_TER.columns[1]] == choix][
-            [df_TER.columns[0], df_TER.columns[4]]
+            [df_TER.columns[0], df_TER.columns[col_index]]
         ].dropna()
 
         Date_Choix = df_Choix[df_Choix.columns[0]].values.tolist()
@@ -52,7 +42,7 @@ def Resultats():
         X = [int(u) for u in Trains_Annul_Choix]
 
         # Graphe de la série temporelle
-        plot_html = graphe_serie64(X, Date_Choix, choix)
+        plot_html = graphe_serie64(X, Date_Choix, choix, nom_variable)
 
         # Statistiques descriptives
         Stats = stats_descriptives(X)
@@ -93,12 +83,13 @@ def Resultats():
             }
 
             # Graphiques
-            rupture_html = graphe_rupture64(X, Date_Choix, k_hat, params1, params2, choix)
+            rupture_html = graphe_rupture64(X, Date_Choix, k_hat, params1, params2, choix, nom_variable)
             logvrai_html = graphe_log_vraisemblance64(log_vraisemblances, k_hat, choix)
             densite_html = graphe_densite_ajustee64(X, k_hat, params1, params2, choix)
 
         return render_template("Resultat_TER.html",
                                choix=choix,
+                               nom_variable=nom_variable,
                                Regions=Liste_Region,
                                Stats_html=Stats,
                                plot_html=plot_html,
