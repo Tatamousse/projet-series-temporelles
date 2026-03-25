@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <title>Résultats — {{ choix }}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap_V336.min.css') }}">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style1.css') }}">
+</head>
+<body>
+<div class="container">
+
+  <h2 style="margin-top: 20px;">Région : {{ choix }}
+    <small style="font-size: 14px; color: #888;"> — Détection de rupture (Skew Normal)</small>
+  </h2>
+
+  <ul class="nav nav-pills" style="margin-top: 15px;">
+    <li class="active"><a data-toggle="pill" href="#StatsD">Statistiques</a></li>
+    <li><a data-toggle="pill" href="#Graphe">Graphe</a></li>
+    <li><a data-toggle="pill" href="#Histo">Histogramme</a></li>
+    <li><a data-toggle="pill" href="#Estimation">Estimation</a></li>
+    <li><a data-toggle="pill" href="#TestKS">Test K-S</a></li>
+    <li class="navbar-right">
+      <button type="button" class="btn btn-dark"
+              onclick="window.location='{{ url_for('index') }}';">
+        ⬅ Retour
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ==================== STATISTIQUES ==================== -->
+    <div id="StatsD" class="tab-pane fade in active" style="padding: 40px;">
+      <table class="table table-hover">
+        <caption>Statistiques descriptives — Nombre de trains annulés</caption>
+        <thead>
+          <tr>
+            <th scope="col">Statistiques</th>
+            <th scope="col">Valeurs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cle, valeur in Stats_html.items() %}
+          <tr>
+            <td>{{ cle }}</td>
+            <td>{{ valeur }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ==================== GRAPHE ==================== -->
+    <div id="Graphe" class="tab-pane fade" style="padding: 20px;">
+      <img src="data:image/png;base64, {{ plot_html }}"
+           width="700" height="550"
+           style="display: block; margin: auto;">
+    </div>
+
+    <!-- ==================== HISTOGRAMME ==================== -->
+    <div id="Histo" class="tab-pane fade" style="padding: 20px;">
+      <img src="data:image/png;base64, {{ histo_html }}"
+           width="700" height="550"
+           style="display: block; margin: auto;">
+    </div>
+
+    <!-- ==================== ESTIMATION ==================== -->
+    <div id="Estimation" class="tab-pane fade" style="padding: 30px;">
+
+      {% if estimation_resultats %}
+
+      <h3 style="color: #2c3e50;">Modèle de rupture — Loi Skew Normal</h3>
+      <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
+        $$X_t \sim \mathcal{SN}(\mu_1, \sigma_1, \theta) \text{ si } t \leq \hat{k}
+        \quad ; \quad
+        X_t \sim \mathcal{SN}(\mu_2, \sigma_2, \theta) \text{ si } t > \hat{k}$$
+      </p>
+
+      <!-- Tableau des paramètres estimés -->
+      <table class="table table-hover" style="max-width: 500px;">
+        <caption>Paramètres estimés (MLE)</caption>
+        <thead>
+          <tr>
+            <th>Paramètre</th>
+            <th>Valeur</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cle, valeur in estimation_resultats.items() %}
+          <tr>
+            <td>{{ cle }}</td>
+            <td><strong>{{ valeur }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <hr/>
+
+      <!-- Graphe de rupture -->
+      <h4>Série temporelle avec point de rupture</h4>
+      <img src="data:image/png;base64, {{ rupture_html }}"
+           width="750" height="500"
+           style="display: block; margin: 20px auto;">
+
+      <hr/>
+
+      <!-- Log-vraisemblance -->
+      <h4>Log-vraisemblance Λ(k)</h4>
+      <img src="data:image/png;base64, {{ logvrai_html }}"
+           width="700" height="500"
+           style="display: block; margin: 20px auto;">
+
+      <hr/>
+
+      <!-- Densités ajustées -->
+      <h4>Densités Skew Normal ajustées</h4>
+      <img src="data:image/png;base64, {{ densite_html }}"
+           width="750" height="550"
+           style="display: block; margin: 20px auto;">
+
+      {% else %}
+      <p style="color: #c0392b; font-size: 16px;">
+        Données insuffisantes pour la détection de rupture.
+      </p>
+      {% endif %}
+
+    </div>
+
+    <!-- ==================== TEST KS ==================== -->
+    <div id="TestKS" class="tab-pane fade" style="padding: 30px;">
+
+      {% if ks_resultats %}
+
+      <h3 style="color: #2c3e50;">Test de Kolmogorov-Smirnov</h3>
+      <p style="font-size: 14px; color: #555;">
+        Comparaison des deux sous-échantillons séparés par le point de rupture k̂.
+      </p>
+
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;
+                  border-left: 5px solid #2c3e50; margin: 20px 0; max-width: 600px;">
+        <p style="font-size: 14px;">
+          <strong>H₀ :</strong> Les deux sous-échantillons suivent la même loi (pas de rupture)<br/>
+          <strong>H₁ :</strong> Les deux sous-échantillons ne suivent pas la même loi (rupture)
+        </p>
+      </div>
+
+      <table class="table table-hover" style="max-width: 500px;">
+        <thead>
+          <tr>
+            <th>Résultat</th>
+            <th>Valeur</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cle, valeur in ks_resultats.items() %}
+          <tr {% if cle == 'Décision' %}
+              style="background: {% if 'Rejet' in valeur|string %}#d4edda{% else %}#f8d7da{% endif %};"
+              {% endif %}>
+            <td>{{ cle }}</td>
+            <td><strong>{{ valeur }}</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% else %}
+      <p style="color: #c0392b; font-size: 16px;">
+        Test non disponible (données insuffisantes).
+      </p>
+      {% endif %}
+
+    </div>
+
+  </div> <!-- tab-content -->
+</div> <!-- container -->
+
+<script src="{{ url_for('static', filename='js/jqueryV1120.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/bootstrapV336.min.js') }}"></script>
+
+<!-- MathJax pour le rendu LaTeX -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS_CHTML-full,Safe"></script>
+
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap_V522.min.css') }}">
+  <title>Détection de Rupture — Skew Normal — TER</title>
+</head>
+
+<body style="margin: 0; padding: 0; min-height: 100vh;
+             background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+                         url('{{ url_for('static', filename='images/trains.jpg') }}') center/cover no-repeat fixed;">
+
+  <div style="max-width: 800px; margin: 80px auto; padding: 40px; text-align: center;">
+
+    <h1 style="color:white; font-family: Helvetica, sans-serif; text-shadow: 2px 2px 8px black;">
+      Régularité mensuelle TER
+    </h1>
+
+    <h3 style="color: #ddd; margin-top: 5px;">
+      Détection de rupture — Loi Skew Normal
+    </h3>
+
+    <br/>
+
+    <h4>
+      <a href="https://ressources.data.sncf.com/explore/dataset/regularite-mensuelle-ter/information/"
+         target="_blank" style="text-decoration:none; color:#87CEEB;">
+        📊 Source de données SNCF
+      </a>
+    </h4>
+
+    <br/><br/>
+
+    <form method="POST" action="{{ url_for('Resultats') }}"
+          style="background: rgba(255,255,255,0.15); padding: 30px; border-radius: 15px; backdrop-filter: blur(5px);">
+
+      <label for="Choix_region" style="color: white; font-size: 16pt; display: block; margin-bottom: 15px;">
+        Choisir une Région :
+      </label>
+
+      <select name="Choix_region" id="Choix_region"
+              style="font-size: 14pt; padding: 8px 20px; border-radius: 8px; border: none; margin-bottom: 15px;">
+        <option value="{}" selected> — Sélectionner — </option>
+        {% for k in Regions %}
+          <option value="{{k}}">{{k}}</option>
+        {% endfor %}
+      </select>
+
+      <br/>
+
+      <input type="submit" value="Analyser"
+             style="font-size: 14pt; padding: 10px 40px; border-radius: 8px; border: none;
+                    background: #2980b9; color: white; cursor: pointer; margin-top: 10px;">
+    </form>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>
