@@ -338,7 +338,7 @@ def graphe_rupture64(X, Date, k_hat, params1, params2, choix, nom_variable="Nomb
     for side in ['right', 'top']:
         ax.spines[side].set_visible(False)
 
-    plt.plot(X, lw=2, color='#2c3e50', label="Trains annulés")
+    plt.plot(X, lw=2, color='#2c3e50', label=nom_variable)
 
     # Ligne de rupture
     plt.axvline(x=k_hat, color='red', linestyle='--', lw=3,
